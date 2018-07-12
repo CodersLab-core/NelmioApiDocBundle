@@ -26,8 +26,12 @@ final class FilteredRouteCollectionBuilder
             ->setDefaults([
                 'path_patterns' => [],
                 'host_patterns' => [],
+                'check_default' => null,
+                'area'          => null
             ])
             ->setAllowedTypes('path_patterns', 'string[]')
+            ->setAllowedTypes('host_patterns', 'string[]')
+            ->setAllowedTypes('host_patterns', 'string[]')
             ->setAllowedTypes('host_patterns', 'string[]')
         ;
 
@@ -55,6 +59,17 @@ final class FilteredRouteCollectionBuilder
 
     private function matchPath(Route $route): bool
     {
+        if (null !== $this->options['area'] && null !== $this->options['checkDefault']) {
+            $areas = $route->getDefault($this->options['checkDefault']);
+            if (!is_array($areas) && !empty($areas)) {
+                $areas = [$areas];
+            }
+
+            if (empty($areas) || !in_array($this->options['area'], $areas)) {
+                return false;
+            }
+        }
+
         foreach ($this->options['path_patterns'] as $pathPattern) {
             if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
                 return true;

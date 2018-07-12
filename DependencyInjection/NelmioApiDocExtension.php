@@ -71,7 +71,7 @@ final class NelmioApiDocExtension extends Extension implements PrependExtensionI
                     new TaggedIteratorArgument('nelmio_api_doc.model_describer'),
                 ]);
 
-            if (0 === count($areaConfig['path_patterns']) && 0 === count($areaConfig['host_patterns'])) {
+            if (0 === count($areaConfig['path_patterns']) && 0 === count($areaConfig['host_patterns']) && empty($areaConfig['check_default'])) {
                 $container->setDefinition(sprintf('nelmio_api_doc.routes.%s', $area), $routesDefinition)
                     ->setPublic(false);
             } else {
@@ -79,7 +79,9 @@ final class NelmioApiDocExtension extends Extension implements PrependExtensionI
                     ->setPublic(false)
                     ->setFactory([
                         (new Definition(FilteredRouteCollectionBuilder::class))
-                            ->addArgument($areaConfig),
+                            ->addArgument($areaConfig['path_patterns'])
+                            ->addArgument(isset($areaConfig['check_default']) ? $areaConfig['check_default'] : null)
+                            ->addArgument($area),
                         'filter',
                     ])
                     ->addArgument($routesDefinition);

@@ -12,8 +12,11 @@
 namespace Nelmio\ApiDocBundle\Tests\DependencyInjection;
 
 use Nelmio\ApiDocBundle\DependencyInjection\Configuration;
+use Nelmio\ApiDocBundle\Routing\FilteredRouteCollectionBuilder;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Processor;
+use Symfony\Component\Routing\Route;
+use Symfony\Component\Routing\RouteCollection;
 
 class ConfigurationTest extends TestCase
 {
@@ -32,9 +35,38 @@ class ConfigurationTest extends TestCase
             'default' => ['path_patterns' => ['/foo'], 'host_patterns' => []],
             'internal' => ['path_patterns' => ['/internal'], 'host_patterns' => ['^swagger\.']],
             'commercial' => ['path_patterns' => ['/internal'], 'host_patterns' => []],
+            'admin' => ['path_patterns' => ['/'], 'host_patterns' => [], 'check_default' => '_areas'],
         ]]]);
 
         $this->assertSame($areas, $config['areas']);
+    }
+
+    public function testDefaultFilter()
+    {
+        $pathPattern = [
+            '^/api',
+        ];
+        $checkDefault = 'api_doc';
+        $area = 'admin';
+
+        $routes = new RouteCollection();
+        $routes->add('r1', new Route('/api/bar/action1', ['api_doc' => 'admin']));
+        $routes->add('r2', new Route('/api/foo/action1', ['api_doc' => 'admin']));
+        $routes->add('r3', new Route('/api/foo/action2'));
+        $routes->add('r4', new Route('/api/demo', ['api_doc' => ['admin', 'default']]));
+        $routes->add('r5', new Route('/_profiler/test/test'));
+
+        $options = [
+            'path_pattern'  => $pathPattern,
+            'host_pattern'  => [],
+            'check_default' => $checkDefault,
+            'area' => $area
+        ];
+
+        $routeBuilder = new FilteredRouteCollectionBuilder($options);
+        $filteredRoutes = $routeBuilder->filter($routes);
+
+        $this->assertCount(3, $filteredRoutes);
     }
 
     public function testAlternativeNames()
