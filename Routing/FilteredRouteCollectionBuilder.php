@@ -31,8 +31,8 @@ final class FilteredRouteCollectionBuilder
             ])
             ->setAllowedTypes('path_patterns', 'string[]')
             ->setAllowedTypes('host_patterns', 'string[]')
-            ->setAllowedTypes('host_patterns', 'string')
-            ->setAllowedTypes('host_patterns', 'string')
+            ->setAllowedTypes('namespace_version', 'string')
+            ->setAllowedTypes('area', 'string')
         ;
 
         if (array_key_exists(0, $options)) {
@@ -63,13 +63,13 @@ final class FilteredRouteCollectionBuilder
         $controllerName = $route->getDefault('_controller');
 
         $namespaceVersionMatches = [];
-        if (preg_match('/\\v\d{1}\\/', $controllerName, $namespaceVersionMatches) && $this->options['area'] === $namespaceVersionMatches[0]) {
-            return true;
-        }
-
-        foreach ($this->options['path_patterns'] as $pathPattern) {
-            if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
-                return true;
+        if (preg_match('/\\\\v\d+\\\\/', $controllerName, $namespaceVersionMatches)
+            && $this->options['area'] === str_replace('\\', '', $namespaceVersionMatches[0]))
+        {
+            foreach ($this->options['path_patterns'] as $pathPattern) {
+                if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
+                    return true;
+                }
             }
         }
 
