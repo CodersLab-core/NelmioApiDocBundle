@@ -19,16 +19,20 @@ final class FilteredRouteCollectionBuilder
 {
     private $options;
 
-    public function __construct(array $options = [])
+    public function __construct(string $area, array $options = [])
     {
         $resolver = new OptionsResolver();
         $resolver
             ->setDefaults([
-                'path_patterns' => [],
-                'host_patterns' => [],
+                'path_patterns'     => [],
+                'host_patterns'     => [],
+                'namespace_version' => 'v1',
+                'area'              => 'default'
             ])
             ->setAllowedTypes('path_patterns', 'string[]')
             ->setAllowedTypes('host_patterns', 'string[]')
+            ->setAllowedTypes('host_patterns', 'string')
+            ->setAllowedTypes('host_patterns', 'string')
         ;
 
         if (array_key_exists(0, $options)) {
@@ -38,6 +42,7 @@ final class FilteredRouteCollectionBuilder
             $options = $normalizedOptions;
         }
 
+        $options['area'] = $area;
         $this->options = $resolver->resolve($options);
     }
 
@@ -55,6 +60,13 @@ final class FilteredRouteCollectionBuilder
 
     private function matchPath(Route $route): bool
     {
+        $controllerName = $route->getDefault('_controller');
+
+        $namespaceVersionMatches = [];
+        if (preg_match('/\\v\d{1}\\/', $controllerName, $namespaceVersionMatches) && $this->options['area'] === $namespaceVersionMatches[0]) {
+            return true;
+        }
+
         foreach ($this->options['path_patterns'] as $pathPattern) {
             if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
                 return true;
