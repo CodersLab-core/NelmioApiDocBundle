@@ -19,7 +19,7 @@ final class FilteredRouteCollectionBuilder
 {
     private $options;
 
-    public function __construct(array $options = [])
+    public function __construct(array $options = [], $check_default = null, $area = null)
     {
         $resolver = new OptionsResolver();
         $resolver
@@ -42,6 +42,9 @@ final class FilteredRouteCollectionBuilder
             $options = $normalizedOptions;
         }
 
+        $options['check_default'] = $check_default;
+        $options['area'] = $area;
+
         $this->options = $resolver->resolve($options);
     }
 
@@ -59,8 +62,13 @@ final class FilteredRouteCollectionBuilder
 
     private function matchPath(Route $route): bool
     {
-        if (null !== $this->options['area'] && null !== $this->options['checkDefault']) {
-            $areas = $route->getDefault($this->options['checkDefault']);
+        if (null !== $this->options['area'] && null !== $this->options['check_default']) {
+            $areas = $route->getDefault($this->options['check_default']);
+
+            if ($areas === null && !$route->hasDefault($this->options['check_default'])) {
+                $areas = 'default';
+            }
+
             if (!is_array($areas) && !empty($areas)) {
                 $areas = [$areas];
             }
