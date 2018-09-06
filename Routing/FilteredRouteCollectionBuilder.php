@@ -62,8 +62,10 @@ final class FilteredRouteCollectionBuilder
         $controllerName = $route->getDefault('_controller');
 
         $namespaceVersionMatches = [];
-        if (preg_match('/(\\\\v\d+\\\\|\\\\jwt\\\\)/is', $controllerName, $namespaceVersionMatches)
-            && $this->options['area'] === str_replace('\\', '', strtolower($namespaceVersionMatches[0]))) {
+        if (
+            preg_match('/(\\\\v\d+\\\\|\\\\jwt\\\\)/is', $controllerName, $namespaceVersionMatches)
+            && $this->options['area'] === str_replace('\\', '', strtolower($namespaceVersionMatches[0]))
+        ) {
             foreach ($this->options['path_patterns'] as $pathPattern) {
                 if (preg_match('{' . $pathPattern . '}', $route->getPath())) {
                     return true;
