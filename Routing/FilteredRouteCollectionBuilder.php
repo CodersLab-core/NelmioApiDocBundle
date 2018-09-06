@@ -27,13 +27,12 @@ final class FilteredRouteCollectionBuilder
                 'path_patterns'     => [],
                 'host_patterns'     => [],
                 'namespace_version' => 'v1',
-                'area'              => 'default'
+                'area'              => 'default',
             ])
             ->setAllowedTypes('path_patterns', 'string[]')
             ->setAllowedTypes('host_patterns', 'string[]')
             ->setAllowedTypes('namespace_version', 'string')
-            ->setAllowedTypes('area', 'string')
-        ;
+            ->setAllowedTypes('area', 'string');
 
         if (array_key_exists(0, $options)) {
             @trigger_error(sprintf('Passing an indexed array with a collection of path patterns as argument 1 for `%s()` is deprecated since 3.2.0, expected structure is an array containing parameterized options.', __METHOD__), E_USER_DEPRECATED);
@@ -63,11 +62,10 @@ final class FilteredRouteCollectionBuilder
         $controllerName = $route->getDefault('_controller');
 
         $namespaceVersionMatches = [];
-        if (preg_match('/\\\\v\d+\\\\/', $controllerName, $namespaceVersionMatches)
-            && $this->options['area'] === str_replace('\\', '', $namespaceVersionMatches[0]))
-        {
+        if (preg_match('/(\\\\v\d+\\\\|\\\\jwt\\\\)/is', $controllerName, $namespaceVersionMatches)
+            && $this->options['area'] === str_replace('\\', '', strtolower($namespaceVersionMatches[0]))) {
             foreach ($this->options['path_patterns'] as $pathPattern) {
-                if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
+                if (preg_match('{' . $pathPattern . '}', $route->getPath())) {
                     return true;
                 }
             }
@@ -79,7 +77,7 @@ final class FilteredRouteCollectionBuilder
     private function matchHost(Route $route): bool
     {
         foreach ($this->options['host_patterns'] as $hostPattern) {
-            if (preg_match('{'.$hostPattern.'}', $route->getHost())) {
+            if (preg_match('{' . $hostPattern . '}', $route->getHost())) {
                 return true;
             }
         }
