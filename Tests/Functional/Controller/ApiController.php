@@ -11,8 +11,7 @@
 
 namespace Nelmio\ApiDocBundle\Tests\Functional\Controller;
 
-use FOS\RestBundle\Controller\Annotations\QueryParam;
-use FOS\RestBundle\Controller\Annotations\RequestParam;
+use Nelmio\ApiDocBundle\Annotation\Areas;
 use Nelmio\ApiDocBundle\Annotation\Model;
 use Nelmio\ApiDocBundle\Annotation\Operation;
 use Nelmio\ApiDocBundle\Annotation\Security;
@@ -21,10 +20,8 @@ use Nelmio\ApiDocBundle\Tests\Functional\Entity\SymfonyConstraints;
 use Nelmio\ApiDocBundle\Tests\Functional\Entity\User;
 use Nelmio\ApiDocBundle\Tests\Functional\Form\DummyType;
 use Nelmio\ApiDocBundle\Tests\Functional\Form\UserType;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Swagger\Annotations as SWG;
-use Symfony\Component\Validator\Constraints\IsTrue;
-use Symfony\Component\Validator\Constraints\Regex;
+use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * @Route("/api", host="api.example.com")
@@ -90,7 +87,7 @@ class ApiController
      *     name="foo",
      *     in="body",
      *     description="This is a parameter",
-     *     @SWG\Schema(ref=@Model(type=UserType::class))
+     *     @SWG\Schema(ref=@Model(type=UserType::class, options={"bar": "baz"}))
      * )
      */
     public function submitUserTypeAction()
@@ -104,16 +101,6 @@ class ApiController
      * )
      */
     public function userAction()
-    {
-    }
-
-    /**
-     * @Route("/fosrest.{_format}", methods={"POST"})
-     * @QueryParam(name="foo", requirements=@Regex("/^\d+$/"))
-     * @RequestParam(name="bar", requirements="\d+")
-     * @RequestParam(name="baz", requirements=@IsTrue)
-     */
-    public function fosrestAction()
     {
     }
 
@@ -191,6 +178,10 @@ class ApiController
      *     description="Success",
      *     @SWG\Schema(ref="#/definitions/Test")
      * )
+     * @SWG\Response(
+     *     response="201",
+     *     ref="#/responses/201"
+     * )
      * @Route("/configReference", methods={"GET"})
      */
     public function configReferenceAction()
@@ -205,6 +196,15 @@ class ApiController
      * @SWG\Response(response=200, description="Worked well!", @Model(type=DummyType::class))
      */
     public function operationsWithOtherAnnotations()
+    {
+    }
+
+    /**
+     * @Route("/areas/new", methods={"GET", "POST"})
+     *
+     * @Areas({"area", "area2"})
+     */
+    public function newAreaAction()
     {
     }
 }

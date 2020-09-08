@@ -13,8 +13,8 @@ namespace Nelmio\ApiDocBundle\Tests\Functional\Controller;
 
 use Nelmio\ApiDocBundle\Annotation\Model;
 use Nelmio\ApiDocBundle\Tests\Functional\Entity\BazingaUser;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Swagger\Annotations as SWG;
+use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * @Route(host="api.example.com")
@@ -30,6 +30,18 @@ class BazingaController
      * )
      */
     public function userAction()
+    {
+    }
+
+    /**
+     * @Route("/api/bazinga_foo", methods={"GET"})
+     * @SWG\Response(
+     *     response=200,
+     *     description="Success",
+     *     @Model(type=BazingaUser::class, groups={"foo"})
+     * )
+     */
+    public function userGroupAction()
     {
     }
 }

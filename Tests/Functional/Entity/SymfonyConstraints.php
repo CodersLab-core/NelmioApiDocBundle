@@ -32,16 +32,9 @@ class SymfonyConstraints
     /**
      * @var int
      *
-     * @Assert\Length(min="1")
-     */
-    private $propertyAssertLengthRequired;
-
-    /**
-     * @var int
-     *
      * @Assert\Length(min="0", max="50")
      */
-    private $propertyAssertLengthMinAndMax;
+    private $propertyAssertLength;
 
     /**
      * @var int
@@ -74,6 +67,13 @@ class SymfonyConstraints
     /**
      * @var int
      *
+     * @Assert\Choice(callback="fetchAllowedChoices")
+     */
+    private $propertyChoiceWithCallbackWithoutClass;
+
+    /**
+     * @var int
+     *
      * @Assert\Expression(
      *     "this.getCategory() in ['php', 'symfony'] or !this.isTechnicalPost()",
      *     message="If this is a tech post, the category should be either php or symfony!"
@@ -82,75 +82,87 @@ class SymfonyConstraints
     private $propertyExpression;
 
     /**
-     * @param int $propertyNotBlank
+     * @var int
+     *
+     * @Assert\Range(min=1, max=5)
+     */
+    private $propertyRange;
+
+    /**
+     * @var int
+     *
+     * @Assert\LessThan(42)
+     */
+    private $propertyLessThan;
+
+    /**
+     * @var int
+     *
+     * @Assert\LessThanOrEqual(23)
+     */
+    private $propertyLessThanOrEqual;
+
+    /**
+     * @Assert\Count(min="0", max="10")
      */
     public function setPropertyNotBlank(int $propertyNotBlank): void
     {
         $this->propertyNotBlank = $propertyNotBlank;
     }
 
-    /**
-     * @param int $propertyNotNull
-     */
     public function setPropertyNotNull(int $propertyNotNull): void
     {
         $this->propertyNotNull = $propertyNotNull;
     }
 
-    /**
-     * @param int $propertyAssertLengthRequired
-     */
-    public function setPropertyAssertLengthRequired(int $propertyAssertLengthRequired): void
+    public function setPropertyAssertLength(int $propertyAssertLength): void
     {
-        $this->propertyAssertLengthRequired = $propertyAssertLengthRequired;
+        $this->propertyAssertLength = $propertyAssertLength;
     }
 
-    /**
-     * @param int $propertyAssertLengthMinAndMax
-     */
-    public function setPropertyAssertLengthMinAndMax(int $propertyAssertLengthMinAndMax): void
-    {
-        $this->propertyAssertLengthMinAndMax = $propertyAssertLengthMinAndMax;
-    }
-
-    /**
-     * @param int $propertyRegex
-     */
     public function setPropertyRegex(int $propertyRegex): void
     {
         $this->propertyRegex = $propertyRegex;
     }
 
-    /**
-     * @param int $propertyCount
-     */
     public function setPropertyCount(int $propertyCount): void
     {
         $this->propertyCount = $propertyCount;
     }
 
-    /**
-     * @param int $propertyChoice
-     */
     public function setPropertyChoice(int $propertyChoice): void
     {
         $this->propertyChoice = $propertyChoice;
     }
 
-    /**
-     * @param int $propertyChoiceWithCallback
-     */
     public function setPropertyChoiceWithCallback(int $propertyChoiceWithCallback): void
     {
         $this->propertyChoiceWithCallback = $propertyChoiceWithCallback;
     }
 
-    /**
-     * @param int $propertyExpression
-     */
+    public function setPropertyChoiceWithCallbackWithoutClass(int $propertyChoiceWithCallbackWithoutClass): void
+    {
+        $this->propertyChoiceWithCallbackWithoutClass = $propertyChoiceWithCallbackWithoutClass;
+    }
+
     public function setPropertyExpression(int $propertyExpression): void
     {
         $this->propertyExpression = $propertyExpression;
+    }
+
+    public function setPropertyRange(int $propertyRange): void
+    {
+        $this->propertyRange = $propertyRange;
+    }
+
+    public function setPropertyLessThan(int $propertyLessThan): void
+    {
+        $this->propertyLessThan = $propertyLessThan;
+    }
+
+    public function setPropertyLessThanOrEqual(int $propertyLessThanOrEqual): void
+    {
+        $this->propertyLessThanOrEqual = $propertyLessThanOrEqual;
     }
 
     /**

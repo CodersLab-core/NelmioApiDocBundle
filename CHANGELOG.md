@@ -1,10 +1,18 @@
 CHANGELOG
 =========
 
-3.3.0 (unreleased)
-------------------
+3.7.0
+-----
 
-* Usage of Google Fonts was removed. System fonts `serif` / `sans` will be used instead. 
+* Added `@SerializedName` annotation support and name converters when using Symfony >= 4.2.
+* Removed pattern added from the Expression Violation message.
+* Added FOSRestBundle 3.x support
+* Added `@SWG` annotations support at methods level in models
+
+3.3.0
+-----
+
+* Usage of Google Fonts was removed. System fonts `serif` / `sans` will be used instead.
   This can lead to a different look on different operating systems.
   You can [re-add Google Fonts again manually by overriding the template](https://symfony.com/doc/current/bundles/NelmioApiDocBundle/faq.html#re-add-google-fonts).
 

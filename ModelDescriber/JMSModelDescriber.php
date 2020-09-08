@@ -13,8 +13,8 @@ namespace Nelmio\ApiDocBundle\ModelDescriber;
 
 use Doctrine\Common\Annotations\Reader;
 use EXSyst\Component\Swagger\Schema;
+use JMS\Serializer\Context;
 use JMS\Serializer\Exclusion\GroupsExclusionStrategy;
-use JMS\Serializer\Metadata\PropertyMetadata;
 use JMS\Serializer\Naming\PropertyNamingStrategyInterface;
 use JMS\Serializer\SerializationContext;
 use Metadata\MetadataFactoryInterface;
@@ -32,12 +32,23 @@ class JMSModelDescriber implements ModelDescriberInterface, ModelRegistryAwareIn
     use ModelRegistryAwareTrait;
 
     private $factory;
+
     private $namingStrategy;
+
     private $doctrineReader;
+
+    private $contexts = [];
+
+    private $metadataStacks = [];
+
+    /**
+     * @var array
+     */
+    private $propertyTypeUseGroupsCache = [];
 
     public function __construct(
         MetadataFactoryInterface $factory,
-        PropertyNamingStrategyInterface $namingStrategy,
+        PropertyNamingStrategyInterface $namingStrategy = null,
         Reader $reader
     ) {
         $this->factory = $factory;
@@ -56,70 +67,124 @@ class JMSModelDescriber implements ModelDescriberInterface, ModelRegistryAwareIn
             throw new \InvalidArgumentException(sprintf('No metadata found for class %s.', $className));
         }
 
-        $groupsExclusion = null !== $model->getGroups() ? new GroupsExclusionStrategy($model->getGroups()) : null;
-
         $schema->setType('object');
         $annotationsReader = new AnnotationsReader($this->doctrineReader, $this->modelRegistry);
         $annotationsReader->updateDefinition(new \ReflectionClass($className), $schema);
 
+        $isJmsV1 = null !== $this->namingStrategy;
         $properties = $schema->getProperties();
+
+        $context = $this->getSerializationContext($model);
+        $context->pushClassMetadata($metadata);
         foreach ($metadata->propertyMetadata as $item) {
             // filter groups
-            if (null !== $groupsExclusion && $groupsExclusion->shouldSkipProperty($item, SerializationContext::create())) {
+            if (null !== $context->getExclusionStrategy() && $context->getExclusionStrategy()->shouldSkipProperty($item, $context)) {
                 continue;
             }
 
-            $name = $this->namingStrategy->translateName($item);
-            $groups = $model->getGroups();
-            if (isset($groups[$name]) && is_array($groups[$name])) {
-                $groups = $model->getGroups()[$name];
+            $context->pushPropertyMetadata($item);
+
+            $name = true === $isJmsV1 ? $this->namingStrategy->translateName($item) : $item->serializedName;
+
+            $reflections = [];
+            if (true === $isJmsV1 && property_exists($item, 'reflection') && null !== $item->reflection) {
+                $reflections[] = $item->reflection;
+            } elseif (\property_exists($item->class, $item->name)) {
+                $reflections[] = new \ReflectionProperty($item->class, $item->name);
             }
 
-            // read property options from Swagger Property annotation if it exists
-            if (null !== $item->reflection) {
-                $property = $properties->get($annotationsReader->getPropertyName($item->reflection, $name));
-                $annotationsReader->updateProperty($item->reflection, $property, $groups);
-            } else {
-                $property = $properties->get($name);
+            if (null !== $item->getter) {
+                $reflections[] = new \ReflectionMethod($item->class, $item->getter);
+            }
+            if (null !== $item->setter) {
+                $reflections[] = new \ReflectionMethod($item->class, $item->setter);
+            }
+
+            $groups = $this->computeGroups($context, $item->type);
+
+            if (true === $item->inline && isset($item->type['name'])) {
+                // currently array types can not be documented :-/
+                if (!in_array($item->type['name'], ['array', 'ArrayCollection'], true)) {
+                    $inlineModel = new Model(new Type(Type::BUILTIN_TYPE_OBJECT, false, $item->type['name']), $groups);
+                    $this->describe($inlineModel, $schema);
+                }
+                $context->popPropertyMetadata();
+
+                continue;
+            }
+
+            foreach ($reflections as $reflection) {
+                $name = $annotationsReader->getPropertyName($reflection, $name);
+            }
+
+            $property = $properties->get($name);
+
+            foreach ($reflections as $reflection) {
+                $annotationsReader->updateProperty($reflection, $property, $groups);
             }
 
             if (null !== $property->getType() || null !== $property->getRef()) {
+                $context->popPropertyMetadata();
+
                 continue;
             }
             if (null === $item->type) {
                 $properties->remove($name);
+                $context->popPropertyMetadata();
 
                 continue;
             }
 
-            if ($nestedType = $this->getNestedTypeInArray($item)) {
-                list($type, $isHash) = $nestedType;
-                if ($isHash) {
-                    $property->setType('object');
-
-                    $typeDef = $this->findPropertyType($type, $groups);
-
-                    // in the case of a virtual property, set it as free object type
-                    $property->merge(['additionalProperties' => $typeDef ?: []]);
-
-                    continue;
-                } else {
-                    $property->setType('array');
-                    $property = $property->getItems();
-                }
-            } else {
-                $type = $item->type['name'];
-            }
-
-            $typeDef = $this->findPropertyType($type, $groups);
-
-            // virtual property
-            if (!$typeDef) {
-                continue;
-            }
-
-            $this->registerPropertyType($typeDef, $property);
+            $this->describeItem($item->type, $property, $context, $item);
+            $context->popPropertyMetadata();
         }
+        $context->popClassMetadata();
+    }
+
+    /**
+     * @internal
+     */
+    public function getSerializationContext(Model $model): SerializationContext
+    {
+        if (isset($this->contexts[$model->getHash()])) {
+            $context = $this->contexts[$model->getHash()];
+
+            $stack = $context->getMetadataStack();
+            while (!$stack->isEmpty()) {
+                $stack->pop();
+            }
+
+            foreach ($this->metadataStacks[$model->getHash()] as $metadataCopy) {
+                $stack->unshift($metadataCopy);
+            }
+        } else {
+            $context = SerializationContext::create();
+
+            if (null !== $model->getGroups()) {
+                $context->addExclusionStrategy(new GroupsExclusionStrategy($model->getGroups()));
+            }
+        }
+
+        return $context;
+    }
+
+    private function computeGroups(Context $context, array $type = null)
+    {
+        if (null === $type || true !== $this->propertyTypeUsesGroups($type)) {
+            return null;
+        }
+
+        $groupsExclusion = $context->getExclusionStrategy();
+        if (!($groupsExclusion instanceof GroupsExclusionStrategy)) {
+            return null;
+        }
+
+        $groups = $groupsExclusion->getGroupsFor($context);
+        if ([GroupsExclusionStrategy::DEFAULT_GROUP] === $groups) {
+            return null;
+        }
+
+        return $groups;
     }
 
     /**
@@ -140,73 +205,99 @@ class JMSModelDescriber implements ModelDescriberInterface, ModelRegistryAwareIn
     }
 
     /**
-     * @param string     $type
-     * @param array|null $groups
-     *
-     * @return array|null
+     * @internal
      */
-    private function findPropertyType(string $type, array $groups = null)
+    public function describeItem(array $type, $property, Context $context)
     {
-        $typeDef = [];
-        if (in_array($type, ['boolean', 'string', 'array'])) {
-            $typeDef['type'] = $type;
-        } elseif (in_array($type, ['int', 'integer'])) {
-            $typeDef['type'] = 'integer';
-        } elseif (in_array($type, ['double', 'float'])) {
-            $typeDef['type'] = 'number';
-            $typeDef['format'] = $type;
-        } elseif (is_subclass_of($type, \DateTimeInterface::class)) {
-            $typeDef['type'] = 'string';
-            $typeDef['format'] = 'date-time';
-        } else {
-            // we can use property type also for custom handlers, then we don't have here real class name
-            if (!class_exists($type)) {
-                return null;
+        $nestedTypeInfo = $this->getNestedTypeInArray($type);
+        if (null !== $nestedTypeInfo) {
+            list($nestedType, $isHash) = $nestedTypeInfo;
+            if ($isHash) {
+                $property->setType('object');
+                // in the case of a virtual property, set it as free object type
+                $property->merge(['additionalProperties' => []]);
+
+                // this is a free form object (as nested array)
+                if ('array' === $nestedType['name'] && !isset($nestedType['params'][0])) {
+                    return;
+                }
+
+                $this->describeItem($nestedType, $property->getAdditionalProperties(), $context);
+
+                return;
             }
 
-            $typeDef['$ref'] = $this->modelRegistry->register(
-                new Model(new Type(Type::BUILTIN_TYPE_OBJECT, false, $type), $groups)
-            );
-        }
+            $property->setType('array');
+            $this->describeItem($nestedType, $property->getItems(), $context);
+        } elseif ('array' === $type['name']) {
+            $property->setType('object');
+            $property->merge(['additionalProperties' => []]);
+        } elseif ('string' === $type['name']) {
+            $property->setType('string');
+        } elseif (in_array($type['name'], ['bool', 'boolean'], true)) {
+            $property->setType('boolean');
+        } elseif (in_array($type['name'], ['int', 'integer'], true)) {
+            $property->setType('integer');
+        } elseif (in_array($type['name'], ['double', 'float'], true)) {
+            $property->setType('number');
+            $property->setFormat($type['name']);
+        } elseif (is_subclass_of($type['name'], \DateTimeInterface::class)) {
+            $property->setType('string');
+            $property->setFormat('date-time');
+        } else {
+            $groups = $this->computeGroups($context, $type);
 
-        return $typeDef;
+            $model = new Model(new Type(Type::BUILTIN_TYPE_OBJECT, false, $type['name']), $groups);
+            $property->setRef($this->modelRegistry->register($model));
+
+            $this->contexts[$model->getHash()] = $context;
+            $this->metadataStacks[$model->getHash()] = clone $context->getMetadataStack();
+        }
     }
 
-    private function registerPropertyType(array $typeDef, $property)
+    private function getNestedTypeInArray(array $type)
     {
-        if (isset($typeDef['$ref'])) {
-            $property->setRef($typeDef['$ref']);
-        } else {
-            if (isset($typeDef['type'])) {
-                $property->setType($typeDef['type']);
-            }
-            if (isset($typeDef['format'])) {
-                $property->setFormat($typeDef['format']);
-            }
-        }
-    }
-
-    /**
-     * @param PropertyMetadata $item
-     *
-     * @return array|null
-     */
-    private function getNestedTypeInArray(PropertyMetadata $item)
-    {
-        if ('array' !== $item->type['name'] && 'ArrayCollection' !== $item->type['name']) {
+        if ('array' !== $type['name'] && 'ArrayCollection' !== $type['name']) {
             return null;
         }
-
         // array<string, MyNamespaceMyObject>
-        if (isset($item->type['params'][1]['name'])) {
-            return [$item->type['params'][1]['name'], true];
+        if (isset($type['params'][1]['name'])) {
+            return [$type['params'][1], true];
         }
-
         // array<MyNamespaceMyObject>
-        if (isset($item->type['params'][0]['name'])) {
-            return [$item->type['params'][0]['name'], false];
+        if (isset($type['params'][0]['name'])) {
+            return [$type['params'][0], false];
         }
 
         return null;
+    }
+
+    /**
+     * @return bool|null
+     */
+    private function propertyTypeUsesGroups(array $type)
+    {
+        if (array_key_exists($type['name'], $this->propertyTypeUseGroupsCache)) {
+            return $this->propertyTypeUseGroupsCache[$type['name']];
+        }
+
+        try {
+            $metadata = $this->factory->getMetadataForClass($type['name']);
+
+            foreach ($metadata->propertyMetadata as $item) {
+                if (null !== $item->groups && $item->groups != [GroupsExclusionStrategy::DEFAULT_GROUP]) {
+                    $this->propertyTypeUseGroupsCache[$type['name']] = true;
+
+                    return true;
+                }
+            }
+            $this->propertyTypeUseGroupsCache[$type['name']] = false;
+
+            return false;
+        } catch (\ReflectionException $e) {
+            $this->propertyTypeUseGroupsCache[$type['name']] = null;
+
+            return null;
+        }
     }
 }

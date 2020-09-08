@@ -39,23 +39,43 @@ final class FosRestDescriber implements RouteDescriberInterface
 
         foreach ($this->getOperations($api, $route) as $operation) {
             foreach ($annotations as $annotation) {
+                $parameterName = $annotation->key ?? $annotation->getName(); // the key used by fosrest
+
                 if ($annotation instanceof QueryParam) {
-                    $parameter = $operation->getParameters()->get($annotation->getName(), 'query');
+                    $name = $parameterName.($annotation->map ? '[]' : '');
+                    $parameter = $operation->getParameters()->get($name, 'query');
                     $parameter->setAllowEmptyValue($annotation->nullable && $annotation->allowBlank);
+
+                    $parameter->setRequired(!$annotation->nullable && $annotation->strict);
                 } else {
                     $body = $operation->getParameters()->get('body', 'body')->getSchema();
                     $body->setType('object');
-                    $parameter = $body->getProperties()->get($annotation->getName());
+                    $parameter = $body->getProperties()->get($parameterName);
+
+                    if (!$annotation->nullable && $annotation->strict) {
+                        $requiredParameters = $body->getRequired();
+                        $requiredParameters[] = $parameterName;
+
+                        $body->setRequired(array_values(array_unique($requiredParameters)));
+                    }
                 }
 
-                $parameter->setRequired(!$annotation->nullable && $annotation->strict);
                 $parameter->setDefault($annotation->getDefault());
-                if (null === $parameter->getType()) {
-                    $parameter->setType($annotation->map ? 'array' : 'string');
+                if (null !== $parameter->getType()) {
+                    continue;
                 }
+
                 if (null === $parameter->getDescription()) {
                     $parameter->setDescription($annotation->description);
                 }
+
+                if ($annotation->map) {
+                    $parameter->setType('array');
+                    $parameter->setCollectionFormat('multi');
+                    $parameter = $parameter->getItems();
+                }
+
+                $parameter->setType('string');
 
                 $pattern = $this->getPattern($annotation->requirements);
                 if (null !== $pattern) {

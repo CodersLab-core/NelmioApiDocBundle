@@ -25,6 +25,9 @@ use Swagger\Annotations as SWG;
 use Swagger\Context;
 use Symfony\Component\Routing\RouteCollection;
 
+// Help opcache.preload discover Swagger\Annotations\Swagger
+class_exists(SWG\Swagger::class);
+
 final class SwaggerPhpDescriber implements ModelRegistryAwareInterface
 {
     use ModelRegistryAwareTrait;
@@ -87,6 +90,9 @@ final class SwaggerPhpDescriber implements ModelRegistryAwareInterface
                 if (0 === strpos($ref, '#/parameters/') && isset($this->api->getParameters()[substr($ref, 13)])) {
                     return;
                 }
+                if (0 === strpos($ref, '#/responses/') && $this->api->getResponses()->has(substr($ref, 12))) {
+                    return;
+                }
 
                 parent::ref($ref);
             }
@@ -117,7 +123,7 @@ final class SwaggerPhpDescriber implements ModelRegistryAwareInterface
                 return $v instanceof SWG\AbstractAnnotation;
             });
 
-            if (0 === count($annotations)) {
+            if (0 === count($annotations) && 0 === count($classAnnotations[$declaringClass->getName()])) {
                 continue;
             }
 
@@ -178,7 +184,7 @@ final class SwaggerPhpDescriber implements ModelRegistryAwareInterface
                 }
 
                 if (!$annotation instanceof SWG\Response && !$annotation instanceof SWG\Parameter && !$annotation instanceof SWG\ExternalDocumentation) {
-                    throw new \LogicException(sprintf('Using the annotation "%s" as a root annotation in "%s::%s()" is not allowed.', get_class($annotation), $method->getDeclaringClass()->name, $method->name));
+                    throw new \LogicException(sprintf('Using the annotation "%s" as a root annotation in "%s::%s()" is not allowed. It should probably be nested in a `@SWG\Response` or `@SWG\Parameter` annotation.', get_class($annotation), $method->getDeclaringClass()->name, $method->name));
                 }
 
                 $implicitAnnotations[] = $annotation;
@@ -226,8 +232,7 @@ final class SwaggerPhpDescriber implements ModelRegistryAwareInterface
             }
 
             $controller = $route->getDefault('_controller');
-            if ($callable = $this->controllerReflector->getReflectionClassAndMethod($controller)) {
-                list($class, $method) = $callable;
+            if ($method = $this->controllerReflector->getReflectionMethod($controller)) {
                 $path = $this->normalizePath($route->getPath());
                 $httpMethods = $route->getMethods() ?: Swagger::$METHODS;
                 $httpMethods = array_map('strtolower', $httpMethods);

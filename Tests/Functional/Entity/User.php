@@ -21,7 +21,7 @@ class User
     /**
      * @var int
      *
-     * @SWG\Property(description = "User id", readOnly = true, title = "userid", example=1, default = null)
+     * @SWG\Property(description = "User id", readOnly = true, title = "userid", default = null)
      */
     private $id;
 
@@ -67,6 +67,11 @@ class User
     private $users;
 
     /**
+     * @var User|null
+     */
+    private $friend;
+
+    /**
      * @var string
      *
      * @SWG\Property(enum = {"disabled", "enabled"})
@@ -74,15 +79,17 @@ class User
     private $status;
 
     /**
-     * @param float $money
+     * @var \DateTimeInterface
      */
+    private $dateAsInterface;
+
     public function setMoney(float $money)
     {
         $this->money = $money;
     }
 
     /**
-     * @param int $id
+     * @SWG\Property(example=1)
      */
     public function setId(int $id)
     {
@@ -102,9 +109,6 @@ class User
         $this->roles = $roles;
     }
 
-    /**
-     * @param int $friendsNumber
-     */
     public function setFriendsNumber(int $friendsNumber)
     {
         $this->friendsNumber = $friendsNumber;
@@ -118,11 +122,25 @@ class User
     {
     }
 
+    public function setFriend(self $friend = null)
+    {
+    }
+
     public function setDummy(Dummy $dummy)
     {
     }
 
     public function setStatus(string $status)
     {
+    }
+
+    public function getDateAsInterface(): \DateTimeInterface
+    {
+        return $this->dateAsInterface;
+    }
+
+    public function setDateAsInterface(\DateTimeInterface $dateAsInterface)
+    {
+        $this->dateAsInterface = $dateAsInterface;
     }
 }

@@ -13,6 +13,61 @@ namespace Nelmio\ApiDocBundle\Tests\Functional;
 
 class JMSFunctionalTest extends WebTestCase
 {
+    protected function setUp()
+    {
+        parent::setUp();
+
+        static::createClient([], ['HTTP_HOST' => 'api.example.com']);
+    }
+
+    public function testModelPictureDocumentation()
+    {
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'id' => [
+                    'type' => 'integer',
+                ],
+            ],
+        ], $this->getModel('JMSPicture')->toArray());
+
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'only_direct_picture_mini' => [
+                    'type' => 'integer',
+                ],
+            ],
+        ], $this->getModel('JMSPicture_mini')->toArray());
+    }
+
+    public function testModeChatDocumentation()
+    {
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'id' => [
+                    'type' => 'integer',
+                ],
+                'members' => [
+                    'items' => [
+                        '$ref' => '#/definitions/JMSChatUser',
+                    ],
+                    'type' => 'array',
+                ],
+            ],
+        ], $this->getModel('JMSChat')->toArray());
+
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'picture' => [
+                    '$ref' => '#/definitions/JMSPicture',
+                ],
+            ],
+        ], $this->getModel('JMSChatUser')->toArray());
+    }
+
     public function testModelDocumentation()
     {
         $this->assertEquals([
@@ -80,11 +135,120 @@ class JMSFunctionalTest extends WebTestCase
                     'description' => 'Only enabled users may be used in actions.',
                     'enum' => ['disabled', 'enabled'],
                 ],
+                'virtual_type1' => [
+                    '$ref' => '#/definitions/VirtualTypeClassDoesNotExistsHandlerDefined',
+                ],
+                'virtual_type2' => [
+                    '$ref' => '#/definitions/VirtualTypeClassDoesNotExistsHandlerNotDefined',
+                ],
                 'last_update' => [
                     'type' => 'date',
                 ],
+                'lat_lon_history' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'number',
+                            'format' => 'float',
+                        ],
+                    ],
+                ],
+                'free_form_object_without_type' => [
+                    'type' => 'object',
+                    'additionalProperties' => true,
+                ],
+                'free_form_object' => [
+                    'type' => 'object',
+                    'additionalProperties' => true,
+                ],
+                'deep_object' => [
+                    'type' => 'object',
+                    'additionalProperties' => [
+                        'type' => 'object',
+                        'additionalProperties' => [
+                            'type' => 'string',
+                            'format' => 'date-time',
+                        ],
+                    ],
+                ],
+                'deep_object_with_items' => [
+                    'type' => 'object',
+                    'additionalProperties' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'string',
+                            'format' => 'date-time',
+                        ],
+                    ],
+                ],
+                'deep_free_form_object_collection' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'additionalProperties' => true,
+                        ],
+                    ],
+                ],
+                'long' => [
+                    'type' => 'string',
+                ],
+                'short' => [
+                    'type' => 'integer',
+                ],
             ],
         ], $this->getModel('JMSUser')->toArray());
+
+        $this->assertEquals([
+        ], $this->getModel('VirtualTypeClassDoesNotExistsHandlerNotDefined')->toArray());
+
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'custom_prop' => [
+                    'type' => 'string',
+                ],
+            ],
+        ], $this->getModel('VirtualTypeClassDoesNotExistsHandlerDefined')->toArray());
+    }
+
+    public function testModelComplexDualDocumentation()
+    {
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'id' => [
+                    'type' => 'integer',
+                ],
+                'complex' => [
+                    '$ref' => '#/definitions/JMSComplex2',
+                ],
+                'user' => [
+                    '$ref' => '#/definitions/JMSUser',
+                ],
+            ],
+        ], $this->getModel('JMSDualComplex')->toArray());
+    }
+
+    public function testNestedGroups()
+    {
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'living' => ['$ref' => '#/definitions/JMSChatLivingRoom'],
+                'dining' => ['$ref' => '#/definitions/JMSChatRoom'],
+            ],
+        ], $this->getModel('JMSChatFriend')->toArray());
+
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'id1' => ['type' => 'integer'],
+                'id3' => ['type' => 'integer'],
+            ],
+        ], $this->getModel('JMSChatRoom')->toArray());
     }
 
     public function testModelComplexDocumentation()
@@ -93,28 +257,16 @@ class JMSFunctionalTest extends WebTestCase
             'type' => 'object',
             'properties' => [
                 'id' => ['type' => 'integer'],
-                'user' => ['$ref' => '#/definitions/JMSUser2'],
+                'user' => ['$ref' => '#/definitions/JMSUser'],
                 'name' => ['type' => 'string'],
                 'virtual' => ['$ref' => '#/definitions/JMSUser'],
+                'virtual_friend' => ['$ref' => '#/definitions/JMSUser'],
             ],
             'required' => [
                 'id',
                 'user',
             ],
         ], $this->getModel('JMSComplex')->toArray());
-
-        $this->assertEquals([
-            'type' => 'object',
-            'properties' => [
-                'id' => [
-                    'type' => 'integer',
-                    'title' => 'userid',
-                    'description' => 'User id',
-                    'readOnly' => true,
-                    'example' => '1',
-                ],
-            ],
-        ], $this->getModel('JMSUser2')->toArray());
     }
 
     public function testYamlConfig()
@@ -130,6 +282,21 @@ class JMSFunctionalTest extends WebTestCase
                 ],
             ],
         ], $this->getModel('VirtualProperty')->toArray());
+    }
+
+    public function testNamingStrategyWithConstraints()
+    {
+        $this->assertEquals([
+            'type' => 'object',
+            'properties' => [
+                'beautifulName' => [
+                    'type' => 'string',
+                    'maxLength' => '10',
+                    'minLength' => '3',
+                ],
+            ],
+            'required' => ['beautifulName'],
+        ], $this->getModel('JMSNamingStrategyConstraints')->toArray());
     }
 
     protected static function createKernel(array $options = [])

@@ -33,10 +33,10 @@ class PropertyPhpDocReader
     /**
      * Update the Swagger information with information from the DocBlock comment.
      */
-    public function updateProperty(\ReflectionProperty $reflectionProperty, Schema $property)
+    public function updateProperty($reflection, Schema $property)
     {
         try {
-            $docBlock = $this->docBlockFactory->create($reflectionProperty);
+            $docBlock = $this->docBlockFactory->create($reflection);
         } catch (\Exception $e) {
             // ignore
             return;
@@ -45,7 +45,7 @@ class PropertyPhpDocReader
         if (!$title = $docBlock->getSummary()) {
             /** @var Var_ $var */
             foreach ($docBlock->getTagsByName('var') as $var) {
-                if (!$description = $var->getDescription()) {
+                if (!method_exists($var, 'getDescription') || !$description = $var->getDescription()) {
                     continue;
                 }
                 $title = $description->render();

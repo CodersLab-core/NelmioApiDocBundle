@@ -17,6 +17,7 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Twig\Environment;
 
 final class SwaggerUiController
 {
@@ -27,8 +28,12 @@ final class SwaggerUiController
     /**
      * @param ContainerInterface $generatorLocator
      */
-    public function __construct($generatorLocator, \Twig_Environment $twig)
+    public function __construct($generatorLocator, $twig)
     {
+        if (!$twig instanceof \Twig_Environment && !$twig instanceof Environment) {
+            throw new \InvalidArgumentException(sprintf('Providing an instance of "%s" as twig is not supported.', get_class($twig)));
+        }
+
         if (!$generatorLocator instanceof ContainerInterface) {
             if (!$generatorLocator instanceof ApiDocGenerator) {
                 throw new \InvalidArgumentException(sprintf('Providing an instance of "%s" to "%s" is not supported.', get_class($generatorLocator), __METHOD__));
@@ -47,7 +52,12 @@ final class SwaggerUiController
     public function __invoke(Request $request, $area = 'default')
     {
         if (!$this->generatorLocator->has($area)) {
-            throw new BadRequestHttpException(sprintf('Area "%s" is not supported.', $area));
+            $advice = '';
+            if (false !== strpos($area, '.json')) {
+                $advice = ' Since the area provided contains `.json`, the issue is likely caused by route priorities. Try switching the Swagger UI / the json documentation routes order.';
+            }
+
+            throw new BadRequestHttpException(sprintf('Area "%s" is not supported as it isn\'t defined in config.%s', $area, $advice));
         }
 
         $spec = $this->generatorLocator->get($area)->generate()->toArray();

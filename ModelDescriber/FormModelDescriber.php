@@ -51,7 +51,7 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
 
         $class = $model->getType()->getClassName();
 
-        $form = $this->formFactory->create($class, null, []);
+        $form = $this->formFactory->create($class, null, $model->getOptions() ?? []);
         $this->parseForm($schema, $form);
     }
 
@@ -75,7 +75,10 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
                 $schema->setRequired($required);
             }
 
-            $property->merge($config->getOption('documentation'));
+            if ($config->hasOption('documentation')) {
+                $property->merge($config->getOption('documentation'));
+            }
+
             if (null !== $property->getType()) {
                 continue; // Type manually defined
             }
@@ -89,21 +92,22 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
      *
      * Returns true if a native Swagger type was found, false otherwise
      *
-     * @param FormConfigBuilderInterface $config
-     * @param                            $property
-     *
-     * @return bool
+     * @param $property
      */
-    private function findFormType(FormConfigBuilderInterface $config, $property): bool
+    private function findFormType(FormConfigBuilderInterface $config, $property)
     {
         $type = $config->getType();
 
         if (!$builtinFormType = $this->getBuiltinFormType($type)) {
             // if form type is not builtin in Form component.
-            $model = new Model(new Type(Type::BUILTIN_TYPE_OBJECT, false, get_class($type->getInnerType())));
+            $model = new Model(
+                new Type(Type::BUILTIN_TYPE_OBJECT, false, get_class($type->getInnerType())),
+                null,
+                $config->getOptions()
+            );
             $property->setRef($this->modelRegistry->register($model));
 
-            return false;
+            return;
         }
 
         do {
@@ -112,33 +116,33 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
             if ('text' === $blockPrefix) {
                 $property->setType('string');
 
-                return true;
+                break;
             }
 
             if ('number' === $blockPrefix) {
                 $property->setType('number');
 
-                return true;
+                break;
             }
 
             if ('integer' === $blockPrefix) {
                 $property->setType('integer');
 
-                return true;
+                break;
             }
 
             if ('date' === $blockPrefix) {
                 $property->setType('string');
                 $property->setFormat('date');
 
-                return true;
+                break;
             }
 
             if ('datetime' === $blockPrefix) {
                 $property->setType('string');
                 $property->setFormat('date-time');
 
-                return true;
+                break;
             }
 
             if ('choice' === $blockPrefix) {
@@ -149,7 +153,14 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
                 }
                 if (($choices = $config->getOption('choices')) && is_array($choices) && count($choices)) {
                     $enums = array_values($choices);
-                    $type = $this->isNumbersArray($enums) ? 'number' : 'string';
+                    if ($this->isNumbersArray($enums)) {
+                        $type = 'number';
+                    } elseif ($this->isBooleansArray($enums)) {
+                        $type = 'boolean';
+                    } else {
+                        $type = 'string';
+                    }
+
                     if ($config->getOption('multiple')) {
                         $property->getItems()->setType($type)->setEnum($enums);
                     } else {
@@ -157,13 +168,35 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
                     }
                 }
 
-                return true;
+                break;
             }
 
             if ('checkbox' === $blockPrefix) {
                 $property->setType('boolean');
 
-                return true;
+                break;
+            }
+
+            if ('password' === $blockPrefix) {
+                $property->setType('string');
+                $property->setFormat('password');
+
+                break;
+            }
+
+            if ('repeated' === $blockPrefix) {
+                $property->setType('object');
+                $property->setRequired([$config->getOption('first_name'), $config->getOption('second_name')]);
+                $subType = $config->getOption('type');
+
+                foreach (['first', 'second'] as $subField) {
+                    $subName = $config->getOption($subField.'_name');
+                    $subForm = $this->formFactory->create($subType, null, array_merge($config->getOption('options'), $config->getOption($subField.'_options')));
+
+                    $this->findFormType($subForm->getConfig(), $property->getProperties()->get($subName));
+                }
+
+                break;
             }
 
             if ('collection' === $blockPrefix) {
@@ -174,34 +207,30 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
                 $property->setType('array');
                 $itemsProp = $property->getItems();
 
-                if (!$this->findFormType($subForm->getConfig(), $itemsProp)) {
-                    $property->setExample(sprintf('[{%s}]', $subType));
-                }
+                $this->findFormType($subForm->getConfig(), $itemsProp);
 
-                return true;
+                break;
             }
 
-            if ('entity' === $blockPrefix) {
+            // The DocumentType is bundled with the DoctrineMongoDBBundle
+            if ('entity' === $blockPrefix || 'document' === $blockPrefix) {
                 $entityClass = $config->getOption('class');
 
                 if ($config->getOption('multiple')) {
                     $property->setFormat(sprintf('[%s id]', $entityClass));
                     $property->setType('array');
+                    $property->getItems()->setType('string');
                 } else {
                     $property->setType('string');
                     $property->setFormat(sprintf('%s id', $entityClass));
                 }
 
-                return true;
+                break;
             }
         } while ($builtinFormType = $builtinFormType->getParent());
-
-        return false;
     }
 
     /**
-     * @param array $array
-     *
      * @return bool true if $array contains only numbers, false otherwise
      */
     private function isNumbersArray(array $array): bool
@@ -216,8 +245,20 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
     }
 
     /**
-     * @param ResolvedFormTypeInterface $type
-     *
+     * @return bool true if $array contains only booleans, false otherwise
+     */
+    private function isBooleansArray(array $array): bool
+    {
+        foreach ($array as $item) {
+            if (!is_bool($item)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @return ResolvedFormTypeInterface|null
      */
     private function getBuiltinFormType(ResolvedFormTypeInterface $type)
@@ -229,7 +270,7 @@ final class FormModelDescriber implements ModelDescriberInterface, ModelRegistry
                 return null;
             }
 
-            if ('entity' === $type->getBlockPrefix()) {
+            if ('entity' === $type->getBlockPrefix() || 'document' === $type->getBlockPrefix()) {
                 return $type;
             }
 

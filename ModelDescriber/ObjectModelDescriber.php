@@ -17,24 +17,36 @@ use Nelmio\ApiDocBundle\Describer\ModelRegistryAwareInterface;
 use Nelmio\ApiDocBundle\Describer\ModelRegistryAwareTrait;
 use Nelmio\ApiDocBundle\Model\Model;
 use Nelmio\ApiDocBundle\ModelDescriber\Annotations\AnnotationsReader;
+use Nelmio\ApiDocBundle\PropertyDescriber\PropertyDescriberInterface;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface;
 use Symfony\Component\PropertyInfo\Type;
+use Symfony\Component\Serializer\NameConverter\NameConverterInterface;
 
 class ObjectModelDescriber implements ModelDescriberInterface, ModelRegistryAwareInterface
 {
     use ModelRegistryAwareTrait;
 
+    /** @var PropertyInfoExtractorInterface */
     private $propertyInfo;
+    /** @var Reader */
     private $doctrineReader;
+    /** @var PropertyDescriberInterface[] */
+    private $propertyDescribers;
+    /** @var NameConverterInterface[] */
+    private $nameConverter;
 
     private $swaggerDefinitionAnnotationReader;
 
     public function __construct(
         PropertyInfoExtractorInterface $propertyInfo,
-        Reader $reader
+        Reader $reader,
+        $propertyDescribers,
+        NameConverterInterface $nameConverter = null
     ) {
         $this->propertyInfo = $propertyInfo;
         $this->doctrineReader = $reader;
+        $this->propertyDescribers = $propertyDescribers;
+        $this->nameConverter = $nameConverter;
     }
 
     public function describe(Model $model, Schema $schema)
@@ -43,13 +55,15 @@ class ObjectModelDescriber implements ModelDescriberInterface, ModelRegistryAwar
         $properties = $schema->getProperties();
 
         $class = $model->getType()->getClassName();
-        $context = [];
+        $context = ['serializer_groups' => null]; // Use the SerializerExtractor with no groups check (sf >= 5.1)
         if (null !== $model->getGroups()) {
-            $context = ['serializer_groups' => $model->getGroups()];
+            $context['serializer_groups'] = array_filter($model->getGroups(), 'is_string');
         }
 
+        $reflClass = new \ReflectionClass($class);
+
         $annotationsReader = new AnnotationsReader($this->doctrineReader, $this->modelRegistry);
-        $annotationsReader->updateDefinition(new \ReflectionClass($class), $schema);
+        $annotationsReader->updateDefinition($reflClass, $schema);
 
         $propertyInfoProperties = $this->propertyInfo->getProperties($class, $context);
         if (null === $propertyInfoProperties) {
@@ -57,19 +71,24 @@ class ObjectModelDescriber implements ModelDescriberInterface, ModelRegistryAwar
         }
 
         foreach ($propertyInfoProperties as $propertyName) {
-            // read property options from Swagger Property annotation if it exists
-            if (property_exists($class, $propertyName)) {
-                $reflectionProperty = new \ReflectionProperty($class, $propertyName);
-                $property = $properties->get($annotationsReader->getPropertyName($reflectionProperty, $propertyName));
+            $serializedName = null !== $this->nameConverter ? $this->nameConverter->normalize($propertyName, $class, null, null !== $model->getGroups() ? ['groups' => $model->getGroups()] : []) : $propertyName;
 
-                $groups = $model->getGroups();
-                if (isset($groups[$propertyName]) && is_array($groups[$propertyName])) {
-                    $groups = $model->getGroups()[$propertyName];
-                }
+            $reflections = $this->getReflections($reflClass, $propertyName);
 
-                $annotationsReader->updateProperty($reflectionProperty, $property, $groups);
-            } else {
-                $property = $properties->get($propertyName);
+            // Check if a custom name is set
+            foreach ($reflections as $reflection) {
+                $serializedName = $annotationsReader->getPropertyName($reflection, $serializedName);
+            }
+
+            $property = $properties->get($serializedName);
+
+            // Interpret additional options
+            $groups = $model->getGroups();
+            if (isset($groups[$propertyName]) && is_array($groups[$propertyName])) {
+                $groups = $model->getGroups()[$propertyName];
+            }
+            foreach ($reflections as $reflection) {
+                $annotationsReader->updateProperty($reflection, $property, $groups);
             }
 
             // If type manually defined
@@ -79,49 +98,63 @@ class ObjectModelDescriber implements ModelDescriberInterface, ModelRegistryAwar
 
             $types = $this->propertyInfo->getTypes($class, $propertyName);
             if (null === $types || 0 === count($types)) {
-                throw new \LogicException(sprintf('The PropertyInfo component was not able to guess the type of %s::$%s', $class, $propertyName));
+                throw new \LogicException(sprintf('The PropertyInfo component was not able to guess the type of %s::$%s. You may need to add a `@var` annotation or use `@SWG\Property(type="")` to make its type explicit.', $class, $propertyName));
             }
             if (count($types) > 1) {
-                throw new \LogicException(sprintf('Property %s::$%s defines more than one type.', $class, $propertyName));
+                throw new \LogicException(sprintf('Property %s::$%s defines more than one type. You can specify the one that should be documented using `@SWG\Property(type="")`.', $class, $propertyName));
             }
 
             $type = $types[0];
-            if (Type::BUILTIN_TYPE_ARRAY === $type->getBuiltinType()) {
-                $type = $type->getCollectionValueType();
-                if (null === $type) {
-                    throw new \LogicException(sprintf('Property "%s:%s" is an array, but no indication of the array elements are made. Use e.g. string[] for an array of string.', $class, $propertyName));
-                }
+            $this->describeProperty($type, $model, $property, $propertyName);
+        }
+    }
 
-                $property->setType('array');
-                $property = $property->getItems();
-            }
+    /**
+     * @return \ReflectionProperty[]|\ReflectionMethod[]
+     */
+    private function getReflections(\ReflectionClass $reflClass, string $propertyName): array
+    {
+        $reflections = [];
+        if ($reflClass->hasProperty($propertyName)) {
+            $reflections[] = $reflClass->getProperty($propertyName);
+        }
 
-            if (Type::BUILTIN_TYPE_STRING === $type->getBuiltinType()) {
-                $property->setType('string');
-            } elseif (Type::BUILTIN_TYPE_BOOL === $type->getBuiltinType()) {
-                $property->setType('boolean');
-            } elseif (Type::BUILTIN_TYPE_INT === $type->getBuiltinType()) {
-                $property->setType('integer');
-            } elseif (Type::BUILTIN_TYPE_FLOAT === $type->getBuiltinType()) {
-                $property->setType('number');
-                $property->setFormat('float');
-            } elseif (Type::BUILTIN_TYPE_OBJECT === $type->getBuiltinType()) {
-                if (is_subclass_of($type->getClassName(), \DateTimeInterface::class)) {
-                    $property->setType('string');
-                    $property->setFormat('date-time');
-                } else {
-                    $property->setRef(
-                        $this->modelRegistry->register(new Model($type, $model->getGroups()))
-                    );
-                }
-            } else {
-                throw new \Exception(sprintf('Unknown type: %s', $type->getBuiltinType()));
+        $camelProp = $this->camelize($propertyName);
+        foreach (['', 'get', 'is', 'has', 'can', 'add', 'remove', 'set'] as $prefix) {
+            if ($reflClass->hasMethod($prefix.$camelProp)) {
+                $reflections[] = $reflClass->getMethod($prefix.$camelProp);
             }
         }
+
+        return $reflections;
+    }
+
+    /**
+     * Camelizes a given string.
+     */
+    private function camelize(string $string): string
+    {
+        return str_replace(' ', '', ucwords(str_replace('_', ' ', $string)));
+    }
+
+    private function describeProperty(Type $type, Model $model, Schema $property, string $propertyName)
+    {
+        foreach ($this->propertyDescribers as $propertyDescriber) {
+            if ($propertyDescriber instanceof ModelRegistryAwareInterface) {
+                $propertyDescriber->setModelRegistry($this->modelRegistry);
+            }
+            if ($propertyDescriber->supports($type)) {
+                $propertyDescriber->describe($type, $property, $model->getGroups());
+
+                return;
+            }
+        }
+
+        throw new \Exception(sprintf('Type "%s" is not supported in %s::$%s. You may use the `@SWG\Property(type="")` annotation to specify it manually.', $type->getBuiltinType(), $model->getType()->getClassName(), $propertyName));
     }
 
     public function supports(Model $model): bool
     {
-        return Type::BUILTIN_TYPE_OBJECT === $model->getType()->getBuiltinType();
+        return Type::BUILTIN_TYPE_OBJECT === $model->getType()->getBuiltinType() && class_exists($model->getType()->getClassName());
     }
 }

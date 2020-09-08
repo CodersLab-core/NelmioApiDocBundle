@@ -11,8 +11,8 @@
 
 namespace Nelmio\ApiDocBundle\Tests\Functional\Controller;
 
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Swagger\Annotations as SWG;
+use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * @Route("/test", host="api-test.example.com")
@@ -27,6 +27,18 @@ class TestController
      * @Route("/test/", methods={"GET"})
      */
     public function testAction()
+    {
+    }
+
+    /**
+     * @SWG\Parameter(ref="#/parameters/test"),
+     * @SWG\Response(
+     *     response="200",
+     *     description="Test Ref"
+     * )
+     * @Route("/test/{id}", methods={"GET"})
+     */
+    public function testRefAction()
     {
     }
 }

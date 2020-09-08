@@ -38,43 +38,48 @@ class SymfonyConstraintAnnotationReader
     /**
      * Update the given property and schema with defined Symfony constraints.
      */
-    public function updateProperty(\ReflectionProperty $reflectionProperty, Schema $property)
+    public function updateProperty($reflection, Schema $property)
     {
-        $annotations = $this->annotationsReader->getPropertyAnnotations($reflectionProperty);
+        if ($reflection instanceof \ReflectionProperty) {
+            $annotations = $this->annotationsReader->getPropertyAnnotations($reflection);
+        } else {
+            $annotations = $this->annotationsReader->getMethodAnnotations($reflection);
+        }
 
         foreach ($annotations as $annotation) {
             if ($annotation instanceof Assert\NotBlank || $annotation instanceof Assert\NotNull) {
-                $this->updateSchemaDefinitionWithRequiredProperty($reflectionProperty);
-            }
-
-            if ($annotation instanceof Assert\Length) {
-                if ($annotation->min > 0) {
-                    $this->updateSchemaDefinitionWithRequiredProperty($reflectionProperty);
+                // The field is required
+                if (null === $this->schema) {
+                    continue;
                 }
 
+                $propertyName = $this->getSchemaPropertyName($property);
+                if (null === $propertyName) {
+                    continue;
+                }
+
+                $existingRequiredFields = $this->schema->getRequired() ?? [];
+                $existingRequiredFields[] = $propertyName;
+
+                $this->schema->setRequired(array_values(array_unique($existingRequiredFields)));
+            } elseif ($annotation instanceof Assert\Length) {
                 $property->setMinLength($annotation->min);
                 $property->setMaxLength($annotation->max);
-            }
-
-            if ($annotation instanceof Assert\Regex) {
+            } elseif ($annotation instanceof Assert\Regex) {
                 $this->appendPattern($property, $annotation->getHtmlPattern());
-            }
-
-            if ($annotation instanceof Assert\DateTime) {
-                $this->appendPattern($property, $annotation->format);
-            }
-
-            if ($annotation instanceof Assert\Count) {
+            } elseif ($annotation instanceof Assert\Count) {
                 $property->setMinItems($annotation->min);
                 $property->setMaxItems($annotation->max);
-            }
-
-            if ($annotation instanceof Assert\Choice) {
-                $property->setEnum($annotation->callback ? call_user_func($annotation->callback) : $annotation->choices);
-            }
-
-            if ($annotation instanceof Assert\Expression) {
-                $this->appendPattern($property, $annotation->message);
+            } elseif ($annotation instanceof Assert\Choice) {
+                $values = $annotation->callback ? call_user_func(is_array($annotation->callback) ? $annotation->callback : [$reflection->class, $annotation->callback]) : $annotation->choices;
+                $property->setEnum(array_values($values));
+            } elseif ($annotation instanceof Assert\Range) {
+                $property->setMinimum($annotation->min);
+                $property->setMaximum($annotation->max);
+            } elseif ($annotation instanceof Assert\LessThan) {
+                $property->setExclusiveMaximum($annotation->value);
+            } elseif ($annotation instanceof Assert\LessThanOrEqual) {
+                $property->setMaximum($annotation->value);
             }
         }
     }
@@ -85,19 +90,21 @@ class SymfonyConstraintAnnotationReader
     }
 
     /**
-     * Set the required properties on the scheme.
+     * Get assigned property name for property schema.
      */
-    private function updateSchemaDefinitionWithRequiredProperty(\ReflectionProperty $reflectionProperty)
+    private function getSchemaPropertyName(Schema $property)
     {
         if (null === $this->schema) {
-            return;
+            return null;
         }
 
-        $existingRequiredFields = $this->schema->getRequired() ?? [];
+        foreach ($this->schema->getProperties() as $name => $schemaProperty) {
+            if ($schemaProperty === $property) {
+                return $name;
+            }
+        }
 
-        $existingRequiredFields[] = $reflectionProperty->getName();
-
-        $this->schema->setRequired(array_values(array_unique($existingRequiredFields)));
+        return null;
     }
 
     /**

@@ -24,8 +24,8 @@ class NelmioApiDocExtensionTest extends TestCase
         $extension = new NelmioApiDocExtension();
         $extension->load([[
             'areas' => [
-                'default' => ['path_patterns' => ['/foo'], 'host_patterns' => []],
-                'commercial' => ['path_patterns' => ['/internal'], 'host_patterns' => []],
+                'default' => ['path_patterns' => ['/foo']],
+                'commercial' => ['path_patterns' => ['/internal']],
             ],
             'models' => [
                 'names' => [
@@ -53,11 +53,11 @@ class NelmioApiDocExtensionTest extends TestCase
                 $this->assertEquals([
                     'Foo1' => [
                         'type' => 'App\\Foo',
-                        'groups' => [],
+                        'groups' => null,
                     ],
                     'Test1' => [
                         'type' => 'App\\Test',
-                        'groups' => [],
+                        'groups' => null,
                     ],
                 ], $methodCall[1][0]);
                 $foundMethodCall = true;
@@ -72,11 +72,11 @@ class NelmioApiDocExtensionTest extends TestCase
                 $this->assertEquals([
                     'Foo1' => [
                         'type' => 'App\\Bar',
-                        'groups' => [],
+                        'groups' => null,
                     ],
                     'Test1' => [
                         'type' => 'App\\Test',
-                        'groups' => [],
+                        'groups' => null,
                     ],
                 ], $methodCall[1][0]);
                 $foundMethodCall = true;

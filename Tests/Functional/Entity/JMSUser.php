@@ -126,6 +126,67 @@ class JMSUser
      */
     private $status;
 
+    /**
+     * JMS custom types handled via Custom Type Handlers.
+     *
+     * @var string
+     * @Serializer\Type("VirtualTypeClassDoesNotExistsHandlerDefined")
+     * @Serializer\Expose
+     */
+    private $virtualType1;
+
+    /**
+     * JMS custom types handled via Custom Type Handlers.
+     *
+     * @var string
+     * @Serializer\Type("VirtualTypeClassDoesNotExistsHandlerNotDefined")
+     * @Serializer\Expose
+     */
+    private $virtualType2;
+
+    /**
+     * @Serializer\Type("array<array<float>>")
+     * @Serializer\Expose
+     */
+    private $latLonHistory;
+
+    /**
+     * @Serializer\Type("array<string, array>")
+     * @Serializer\Expose
+     */
+    private $freeFormObject;
+
+    /**
+     * @Serializer\Type("array")
+     * @Serializer\Expose
+     */
+    private $freeFormObjectWithoutType;
+
+    /**
+     * @Serializer\Type("array<string, array<string, DateTime>>")
+     * @Serializer\Expose
+     */
+    private $deepObject;
+
+    /**
+     * @Serializer\Type("array<string, array<DateTime>>")
+     * @Serializer\Expose
+     */
+    private $deepObjectWithItems;
+
+    /**
+     * @Serializer\Type("array<array<array<string, array>>>")
+     * @Serializer\Expose
+     */
+    private $deepFreeFormObjectCollection;
+
+    /**
+     * @Serializer\Type("Nelmio\ApiDocBundle\Tests\Functional\Entity\JMSNote")
+     * @Serializer\Inline()
+     * @Serializer\Expose
+     */
+    private $notes;
+
     public function setRoles($roles)
     {
     }
