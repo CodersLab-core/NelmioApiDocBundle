@@ -63,12 +63,13 @@ final class Configuration implements ConfigurationInterface
                                 'with_annotation' => false,
                                 'documentation' => [],
                                 'name_patterns' => [],
+                                'namespace_version' => 'v1'
                             ],
                         ]
                     )
                     ->beforeNormalization()
                         ->ifTrue(function ($v) {
-                            return 0 === count($v) || isset($v['path_patterns']) || isset($v['host_patterns']) || isset($v['documentation']);
+                            return 0 === count($v) || isset($v['path_patterns']) || isset($v['host_patterns']) || isset($v['documentation']) || isset($v['namespace_version']);
                         })
                         ->then(function ($v) {
                             return ['default' => $v];
@@ -102,6 +103,9 @@ final class Configuration implements ConfigurationInterface
                             ->booleanNode('with_annotation')
                                 ->defaultFalse()
                                 ->info('whether to filter by annotation')
+                            ->end()
+                            ->scalarNode('namespace_version')
+                                ->example('v1')
                             ->end()
                             ->arrayNode('documentation')
                                 ->useAttributeAsKey('key')

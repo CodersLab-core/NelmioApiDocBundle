@@ -45,11 +45,13 @@ final class FilteredRouteCollectionBuilder
                 'host_patterns' => [],
                 'name_patterns' => [],
                 'with_annotation' => false,
+                'namespace_version' => 'v1'
             ])
             ->setAllowedTypes('path_patterns', 'string[]')
             ->setAllowedTypes('host_patterns', 'string[]')
             ->setAllowedTypes('name_patterns', 'string[]')
             ->setAllowedTypes('with_annotation', 'boolean')
+            ->setAllowedTypes('namespace_version', 'string')
         ;
 
         if (array_key_exists(0, $options)) {
@@ -83,6 +85,16 @@ final class FilteredRouteCollectionBuilder
 
     private function matchPath(Route $route): bool
     {
+        $controllerName = $route->getDefault('_controller');
+
+        $namespaceVersionMatches = [];
+
+        if (preg_match('/(\\\\v\d+\\\\|\\\\jwt\\\\)/is', $controllerName, $namespaceVersionMatches) &&
+            $this->area === str_replace('\\', '', strtolower($namespaceVersionMatches[0]))
+        ) {
+            return true;
+        }
+
         foreach ($this->options['path_patterns'] as $pathPattern) {
             if (preg_match('{'.$pathPattern.'}', $route->getPath())) {
                 return true;
