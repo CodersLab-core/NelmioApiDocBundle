@@ -11,7 +11,7 @@
 
 namespace Nelmio\ApiDocBundle\Tests\Functional\Entity;
 
-use Swagger\Annotations as SWG;
+use OpenApi\Annotations as OA;
 
 /**
  * @author Guilhem N. <egetick@gmail.com>
@@ -21,19 +21,21 @@ class User
     /**
      * @var int
      *
-     * @SWG\Property(description = "User id", readOnly = true, title = "userid", default = null)
+     * @OA\Property(description = "User id", readOnly = true, title = "userid", default = null)
      */
     private $id;
 
     /**
-     * @SWG\Property(type="string", readOnly = false)
+     * @OA\Property(type="string", readOnly = false)
      */
     private $email;
 
     /**
+     * User Roles Comment.
+     *
      * @var string[]
      *
-     * @SWG\Property(
+     * @OA\Property(
      *     description = "User roles",
      *     title = "roles",
      *     example="[""ADMIN"",""SUPERUSER""]",
@@ -43,21 +45,28 @@ class User
     private $roles;
 
     /**
+     * User Location.
+     *
+     * @OA\Property(type = "string")
+     */
+    private $location;
+
+    /**
      * @var int
      *
-     * @SWG\Property(type = "string")
+     * @OA\Property(type = "string")
      */
     private $friendsNumber;
 
     /**
      * @var float
-     * @SWG\Property(default = 0.0)
+     * @OA\Property(default = 0.0)
      */
     private $money;
 
     /**
      * @var \DateTime
-     * @SWG\Property(property="creationDate")
+     * @OA\Property(property="creationDate")
      */
     private $createdAt;
 
@@ -72,9 +81,14 @@ class User
     private $friend;
 
     /**
+     * @var User[]|null
+     */
+    private $friends;
+
+    /**
      * @var string
      *
-     * @SWG\Property(enum = {"disabled", "enabled"})
+     * @OA\Property(enum = {"disabled", "enabled"})
      */
     private $status;
 
@@ -89,7 +103,7 @@ class User
     }
 
     /**
-     * @SWG\Property(example=1)
+     * @OA\Property(example=1)
      */
     public function setId(int $id)
     {
@@ -109,6 +123,10 @@ class User
         $this->roles = $roles;
     }
 
+    public function setLocation(string $location)
+    {
+    }
+
     public function setFriendsNumber(int $friendsNumber)
     {
         $this->friendsNumber = $friendsNumber;
@@ -123,6 +141,10 @@ class User
     }
 
     public function setFriend(self $friend = null)
+    {
+    }
+
+    public function setFriends(array $friends = [])
     {
     }
 

@@ -111,7 +111,7 @@ final class FilteredRouteCollectionBuilder
             }
         }
 
-        return  0 === count($this->options['name_patterns']);
+        return 0 === count($this->options['name_patterns']);
     }
 
     private function matchAnnotation(Route $route): bool
@@ -120,18 +120,21 @@ final class FilteredRouteCollectionBuilder
             return true;
         }
 
-        $method = $this->controllerReflector->getReflectionMethod(
-            $route->getDefault('_controller') ?? ''
-        );
-        if (null === $method) {
+        $reflectionMethod = $this->controllerReflector->getReflectionMethod($route->getDefault('_controller'));
+
+        if (null === $reflectionMethod) {
             return false;
         }
 
         /** @var Areas|null $areas */
         $areas = $this->annotationReader->getMethodAnnotation(
-            $method,
+            $reflectionMethod,
             Areas::class
         );
+
+        if (null === $areas) {
+            $areas = $this->annotationReader->getClassAnnotation($reflectionMethod->getDeclaringClass(), Areas::class);
+        }
 
         return (null !== $areas) ? $areas->has($this->area) : false;
     }

@@ -11,7 +11,7 @@
 
 namespace Nelmio\ApiDocBundle\Tests\Functional\Controller;
 
-use Swagger\Annotations as SWG;
+use OpenApi\Annotations as OA;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
@@ -20,25 +20,13 @@ use Symfony\Component\Routing\Annotation\Route;
 class TestController
 {
     /**
-     * @SWG\Response(
+     * @OA\Response(
      *     response="200",
      *     description="Test"
      * )
      * @Route("/test/", methods={"GET"})
      */
     public function testAction()
-    {
-    }
-
-    /**
-     * @SWG\Parameter(ref="#/parameters/test"),
-     * @SWG\Response(
-     *     response="200",
-     *     description="Test Ref"
-     * )
-     * @Route("/test/{id}", methods={"GET"})
-     */
-    public function testRefAction()
     {
     }
 }

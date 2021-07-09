@@ -11,12 +11,18 @@
 
 namespace Nelmio\ApiDocBundle\PropertyDescriber;
 
-use EXSyst\Component\Swagger\Schema;
+use OpenApi\Annotations\Schema;
 use Symfony\Component\PropertyInfo\Type;
 
 interface PropertyDescriberInterface
 {
-    public function describe(Type $type, Schema $property, array $groups = null);
+    /**
+     * @param Type[] $types
+     */
+    public function describe(array $types, Schema $property, array $groups = null);
 
-    public function supports(Type $type): bool;
+    /**
+     * @param Type[] $types
+     */
+    public function supports(array $types): bool;
 }

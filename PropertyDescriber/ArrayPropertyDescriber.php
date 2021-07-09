@@ -11,14 +11,16 @@
 
 namespace Nelmio\ApiDocBundle\PropertyDescriber;
 
-use EXSyst\Component\Swagger\Schema;
 use Nelmio\ApiDocBundle\Describer\ModelRegistryAwareInterface;
 use Nelmio\ApiDocBundle\Describer\ModelRegistryAwareTrait;
-use Symfony\Component\PropertyInfo\Type;
+use Nelmio\ApiDocBundle\Exception\UndocumentedArrayItemsException;
+use Nelmio\ApiDocBundle\OpenApiPhp\Util;
+use OpenApi\Annotations as OA;
 
 class ArrayPropertyDescriber implements PropertyDescriberInterface, ModelRegistryAwareInterface
 {
     use ModelRegistryAwareTrait;
+    use NullablePropertyTrait;
 
     /** @var PropertyDescriberInterface[] */
     private $propertyDescribers;
@@ -28,30 +30,39 @@ class ArrayPropertyDescriber implements PropertyDescriberInterface, ModelRegistr
         $this->propertyDescribers = $propertyDescribers;
     }
 
-    public function describe(Type $type, Schema $property, array $groups = null)
+    public function describe(array $types, OA\Schema $property, array $groups = null)
     {
-        $type = $type->getCollectionValueType();
+        $type = $types[0]->getCollectionValueType();
         if (null === $type) {
-            throw new \LogicException(sprintf('Property "%s" is an array, but its items type isn\'t specified. You can specify that by using the type `string[]` for instance or `@SWG\Property(type="array", @SWG\Items(type="string"))`.', $property->getTitle()));
+            throw new UndocumentedArrayItemsException();
         }
 
-        $property->setType('array');
-        $property = $property->getItems();
+        $property->type = 'array';
+        $this->setNullableProperty($types[0], $property);
+        $property = Util::getChild($property, OA\Items::class);
 
         foreach ($this->propertyDescribers as $propertyDescriber) {
             if ($propertyDescriber instanceof ModelRegistryAwareInterface) {
                 $propertyDescriber->setModelRegistry($this->modelRegistry);
             }
-            if ($propertyDescriber->supports($type)) {
-                $propertyDescriber->describe($type, $property, $groups);
+            if ($propertyDescriber->supports([$type])) {
+                try {
+                    $propertyDescriber->describe([$type], $property, $groups);
+                } catch (UndocumentedArrayItemsException $e) {
+                    if (null !== $e->getClass()) {
+                        throw $e; // This exception is already complete
+                    }
+
+                    throw new UndocumentedArrayItemsException(null, sprintf('%s[]', $e->getPath()));
+                }
 
                 break;
             }
         }
     }
 
-    public function supports(Type $type): bool
+    public function supports(array $types): bool
     {
-        return $type->isCollection();
+        return 1 === count($types) && $types[0]->isCollection();
     }
 }

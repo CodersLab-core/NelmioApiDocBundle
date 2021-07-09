@@ -11,27 +11,32 @@
 
 namespace Nelmio\ApiDocBundle\PropertyDescriber;
 
-use EXSyst\Component\Swagger\Schema;
 use Nelmio\ApiDocBundle\Describer\ModelRegistryAwareInterface;
 use Nelmio\ApiDocBundle\Describer\ModelRegistryAwareTrait;
 use Nelmio\ApiDocBundle\Model\Model;
+use OpenApi\Annotations as OA;
 use Symfony\Component\PropertyInfo\Type;
 
 class ObjectPropertyDescriber implements PropertyDescriberInterface, ModelRegistryAwareInterface
 {
     use ModelRegistryAwareTrait;
 
-    public function describe(Type $type, Schema $property, array $groups = null)
+    public function describe(array $types, OA\Schema $property, array $groups = null)
     {
-        $type = new Type($type->getBuiltinType(), false, $type->getClassName(), $type->isCollection(), $type->getCollectionKeyType(), $type->getCollectionValueType()); // ignore nullable field
+        $type = new Type($types[0]->getBuiltinType(), false, $types[0]->getClassName(), $types[0]->isCollection(), $types[0]->getCollectionKeyType(), $types[0]->getCollectionValueType()); // ignore nullable field
 
-        $property->setRef(
-            $this->modelRegistry->register(new Model($type, $groups))
-        );
+        if ($types[0]->isNullable()) {
+            $property->nullable = true;
+            $property->allOf = [new OA\Schema(['ref' => $this->modelRegistry->register(new Model($type, $groups))])];
+
+            return;
+        }
+
+        $property->ref = $this->modelRegistry->register(new Model($type, $groups));
     }
 
-    public function supports(Type $type): bool
+    public function supports(array $types): bool
     {
-        return Type::BUILTIN_TYPE_OBJECT === $type->getBuiltinType();
+        return 1 === count($types) && Type::BUILTIN_TYPE_OBJECT === $types[0]->getBuiltinType();
     }
 }

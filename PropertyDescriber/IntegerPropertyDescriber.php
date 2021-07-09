@@ -11,18 +11,21 @@
 
 namespace Nelmio\ApiDocBundle\PropertyDescriber;
 
-use EXSyst\Component\Swagger\Schema;
+use OpenApi\Annotations as OA;
 use Symfony\Component\PropertyInfo\Type;
 
 class IntegerPropertyDescriber implements PropertyDescriberInterface
 {
-    public function describe(Type $type, Schema $property, array $groups = null)
+    use NullablePropertyTrait;
+
+    public function describe(array $types, OA\Schema $property, array $groups = null)
     {
-        $property->setType('integer');
+        $property->type = 'integer';
+        $this->setNullableProperty($types[0], $property);
     }
 
-    public function supports(Type $type): bool
+    public function supports(array $types): bool
     {
-        return Type::BUILTIN_TYPE_INT === $type->getBuiltinType();
+        return 1 === count($types) && Type::BUILTIN_TYPE_INT === $types[0]->getBuiltinType();
     }
 }

@@ -1,6 +1,10 @@
 CHANGELOG
 =========
 
+4.0.0
+-----
+* Added support of OpenAPI 3.0. The internals were completely reworked and this version introduces BC breaks.
+
 3.7.0
 -----
 

@@ -11,14 +11,14 @@
 
 namespace Nelmio\ApiDocBundle\Tests\Functional\Controller;
 
-use Swagger\Annotations as SWG;
+use OpenApi\Annotations as OA;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
  * Prevents a regression (see https://github.com/nelmio/NelmioApiDocBundle/issues/1559).
  *
  * @Route("/api/invoke", host="api.example.com", name="invokable", methods={"GET"})
- * @SWG\Response(
+ * @OA\Response(
  *    response=200,
  *    description="Invokable!"
  * )

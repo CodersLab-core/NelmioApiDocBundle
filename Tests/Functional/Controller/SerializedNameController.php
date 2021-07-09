@@ -13,7 +13,7 @@ namespace Nelmio\ApiDocBundle\Tests\Functional\Controller;
 
 use Nelmio\ApiDocBundle\Annotation\Model;
 use Nelmio\ApiDocBundle\Tests\Functional\EntityExcluded\SerializedNameEnt;
-use Swagger\Annotations as SWG;
+use OpenApi\Annotations as OA;
 use Symfony\Component\Routing\Annotation\Route;
 
 /**
@@ -24,7 +24,7 @@ use Symfony\Component\Routing\Annotation\Route;
 class SerializedNameController
 {
     /**
-     * @SWG\Response(
+     * @OA\Response(
      *     response="200",
      *     description="success",
      *     @Model(type=SerializedNameEnt::class)
