@@ -2,30 +2,33 @@
 
 <!-- http://phpunit.de/manual/4.1/en/appendixes.configuration.html -->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="http://schema.phpunit.de/4.6/phpunit.xsd"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
          backupGlobals="false"
          colors="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         stopOnFailure="false"
          bootstrap="vendor/autoload.php"
+         displayDetailsOnTestsThatTriggerWarnings="true"
 >
     <php>
         <env name="SHELL_VERBOSITY" value="-1" />
         <ini name="error_reporting" value="-1" />
-        <env name="SYMFONY_DEPRECATIONS_HELPER" value="max[self]=0" />
+        <ini name="memory_limit" value="512M" />
+
+        <!-- add "generateBaseline=true&amp;" to the value to generate a new baseline. Keep in mind to clear the test cache before. -->
+        <env name="SYMFONY_DEPRECATIONS_HELPER" value="ignoreFile=./phpunit-ignore.txt&amp;max[self]=0" />
     </php>
 
     <testsuites>
         <testsuite name="Project Test Suite">
-            <directory>Tests</directory>
+            <directory>tests</directory>
         </testsuite>
     </testsuites>
 
-    <filter>
-        <whitelist>
-            <directory>.</directory>
-            <exclude>
-                <directory>Tests</directory>
-                <directory>vendor</directory>
-            </exclude>
-        </whitelist>
-    </filter>
+    <source>
+      <include>
+        <directory suffix=".php">src</directory>
+      </include>
+    </source>
 </phpunit>

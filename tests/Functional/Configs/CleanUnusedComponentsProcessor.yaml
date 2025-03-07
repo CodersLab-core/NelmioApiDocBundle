@@ -1,0 +1,6 @@
+services:
+  OpenApi\Processors\CleanUnusedComponents:
+    tags:
+      - { name: 'nelmio_api_doc.swagger.processor', priority: -100 }
+    calls:
+      - setEnabled: [ true ]
